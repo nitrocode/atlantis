@@ -45,7 +45,8 @@ jobs:
       DOCKER_REPO: ghcr.io/${{ github.repository }}
       # Push if not a pull request and references the main branch
       PUSH: ${{ ( github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) || github.event.inputs.push_overide ) }}
-      GITHUB_REF: ${{ github.event.inputs.tag_override != '' && 'refs/tags/${{ github.event.inputs.tag_override }}' || github.ref }}
+      GITHUBREF: ${{ github.event.inputs.tag_override != '' && 'refs/tags/${{ github.event.inputs.tag_override }}' || github.ref }}
+      TAG: ${{ github.event.inputs.tag_override != '' && github.event.inputs.tag_override || ( startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || '' ) }}
 
     steps:
     - name: Dump GitHub context
@@ -90,19 +91,19 @@ jobs:
           org.opencontainers.image.licenses=Apache-2.0
         tags: |
           # semver
-          type=semver,pattern={{version}},prefix=v,suffix=${{ env.SUFFIX }}
-          type=semver,pattern={{version}},prefix=v,enable=${{ matrix.image_type == 'alpine' }}
-          type=semver,pattern={{major}}.{{minor}},prefix=v,suffix=${{ env.SUFFIX }}
+          type=semver,pattern={{version}},prefix=v,suffix=${{ env.SUFFIX }},value=${{ env.TAG }}
+          type=semver,pattern={{version}},prefix=v,enable=${{ matrix.image_type == 'alpine' }},value=${{ env.TAG }}
+          type=semver,pattern={{major}}.{{minor}},prefix=v,suffix=${{ env.SUFFIX }},value=${{ env.TAG }}
           # dev
           type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}
           type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}-{{ sha }}
-          type=raw,event=push,value=dev,enable=${{ env.GITHUB_REF == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }},suffix=
+          type=raw,event=push,value=dev,enable=${{ env.GITHUBREF == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }},suffix=
           # prerelease
-          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(env.GITHUB_REF, 'refs/tags/') && contains(env.GITHUB_REF, 'pre') && matrix.image_type == 'alpine' }},suffix=
-          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(env.GITHUB_REF, 'refs/tags/') && contains(env.GITHUB_REF, 'pre') }},suffix=${{ env.SUFFIX }}
+          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && contains(env.GITHUBREF, 'pre') && matrix.image_type == 'alpine' }},suffix=
+          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && contains(env.GITHUBREF, 'pre') }},suffix=${{ env.SUFFIX }}
           # latest
-          type=raw,event=tag,value=latest,enable=${{ startsWith(env.GITHUB_REF, 'refs/tags/') && !contains(env.GITHUB_REF, 'pre') && matrix.image_type == 'alpine' }},suffix=
-          type=raw,event=tag,value=latest,enable=${{ startsWith(env.GITHUB_REF, 'refs/tags/') && !contains(env.GITHUB_REF, 'pre') }},suffix=${{ env.SUFFIX }}
+          type=raw,event=tag,value=latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && !contains(env.GITHUBREF, 'pre') && matrix.image_type == 'alpine' }},suffix=
+          type=raw,event=tag,value=latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && !contains(env.GITHUBREF, 'pre') }},suffix=${{ env.SUFFIX }}
           # pr
           type=ref,event=pr,suffix=${{ env.SUFFIX }}
         flavor: |
@@ -122,7 +123,7 @@ jobs:
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
       run: echo "RELEASE_VERSION=${{ startsWith(env.GITHUB_REF, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
 
-    - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
+    - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} ${{ env.RELEASE_VERSION }} image"
       if: false # contains(fromJson('["push", "pull_request"]'), github.event_name)
       uses: docker/build-push-action@v4
       with:
