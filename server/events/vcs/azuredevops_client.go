@@ -130,6 +130,10 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	return nil
 }
 
+func (g *AzureDevopsClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error { //nolint: revive
+	return nil
+}
+
 func (g *AzureDevopsClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	return nil
 }
@@ -325,7 +329,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest, pullOptions model
 		BypassPolicy:            new(bool),
 		BypassReason:            azuredevops.String(""),
 		DeleteSourceBranch:      &pullOptions.DeleteSourceBranchOnMerge,
-		MergeCommitMessage:      azuredevops.String(common.AutomergeCommitMsg),
+		MergeCommitMessage:      azuredevops.String(common.AutomergeCommitMsg(pull.Num)),
 		MergeStrategy:           &mcm,
 		SquashMerge:             new(bool),
 		TransitionWorkItems:     twi,
