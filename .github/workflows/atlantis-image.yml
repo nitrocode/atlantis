@@ -20,12 +20,17 @@ on:
   workflow_dispatch:
     inputs:
       push_override:
-        description: Push ?
+        description: Push tags
         type: boolean
         required: false
         default: false
+      push_latest_tags:
+        description: Push alpine "latest" tags like "dev"
+        type: boolean
+        required: false
+        default: true
       tag_override:
-        description: Add a v prefixed release tag
+        description: Add a v prefixed release tag. Empty defaults to a pr merge.
         type: string
         required: false
         default: ""
@@ -59,7 +64,7 @@ jobs:
 
     # Lint the Dockerfile first before setting anything up
     - name: Lint Dockerfile
-      uses: hadolint/hadolint-action@master
+      uses: hadolint/hadolint-action@v3.1.0
       with:
         dockerfile: "Dockerfile"
 
@@ -97,13 +102,13 @@ jobs:
           # dev
           type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}
           type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}-{{ sha }}
-          type=raw,event=push,value=dev,enable=${{ env.GITHUBREF == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }},suffix=
+          type=raw,event=push,value=dev,enable=${{ env.GITHUBREF == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' && github.events.input.push_latest_tags }},suffix=
           # prerelease
-          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && contains(env.GITHUBREF, 'pre') && matrix.image_type == 'alpine' }},suffix=
-          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && contains(env.GITHUBREF, 'pre') }},suffix=${{ env.SUFFIX }}
+          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && contains(env.GITHUBREF, 'pre') && matrix.image_type == 'alpine' && github.events.input.push_latest_tags }},suffix=
+          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && contains(env.GITHUBREF, 'pre') && github.events.input.push_latest_tags }},suffix=${{ env.SUFFIX }}
           # latest
-          type=raw,event=tag,value=latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && !contains(env.GITHUBREF, 'pre') && matrix.image_type == 'alpine' }},suffix=
-          type=raw,event=tag,value=latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && !contains(env.GITHUBREF, 'pre') }},suffix=${{ env.SUFFIX }}
+          type=raw,event=tag,value=latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && !contains(env.GITHUBREF, 'pre') && matrix.image_type == 'alpine' && github.events.input.push_latest_tags }},suffix=
+          type=raw,event=tag,value=latest,enable=${{ startsWith(env.GITHUBREF, 'refs/tags/') && !contains(env.GITHUBREF, 'pre') && github.events.input.push_latest_tags }},suffix=${{ env.SUFFIX }}
           # pr
           type=ref,event=pr,suffix=${{ env.SUFFIX }}
         flavor: |
@@ -121,7 +126,7 @@ jobs:
     # Publish release to container registry
     - name: Populate release version
       if: contains(fromJson('["push", "pull_request", "workflow_dispatch"]'), github.event_name)
-      run: echo "RELEASE_VERSION=${{ startsWith(env.GITHUBREF, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
+      run: echo "RELEASE_VERSION=${{ startsWith(env.GITHUBREF, 'refs/tags/') && env.TAG || 'dev' }}" >> $GITHUB_ENV
 
     - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} ${{ env.RELEASE_VERSION }} image"
       if: false # contains(fromJson('["push", "pull_request"]'), github.event_name)
